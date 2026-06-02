@@ -5,6 +5,11 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Penjualan;
 use App\Models\DetailPenjualan;
+use App\Models\VarianProduk;
+use App\Models\Resep;
+use App\Models\DetailResep;
+use App\Models\StokGerobak;
+use App\Models\MutasiStok;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
@@ -15,7 +20,6 @@ class PenjualanController extends Controller
 {
     public function store(Request $request)
     {
-        // 1. Validasi Input (Pastikan ada array 'items' yang dikirim dari kasir)
         $validator = Validator::make($request->all(), [
             'gerobak_id'               => 'required|uuid',
             'kasir_id'                 => 'required|uuid',
@@ -31,22 +35,17 @@ class PenjualanController extends Controller
             return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
         }
 
-        // 2. Mulai Database Transaction
         DB::beginTransaction();
 
         try {
-            // Generate Nomor Penjualan Unik (Contoh: TRX-20260601-XXXX)
             $tanggal = Carbon::now();
             $nomorPenjualan = 'TRX-' . $tanggal->format('Ymd') . '-' . strtoupper(Str::random(4));
 
-            // Hitung Subtotal dari seluruh item di keranjang
             $subtotal = 0;
-            $items = $request->items;
-            foreach ($items as $item) {
+            foreach ($request->items as $item) {
                 $subtotal += ($item['jumlah'] * $item['harga_satuan']);
             }
 
-            // Simpan Header Penjualan ke tabel `penjualan`
             $penjualan = Penjualan::create([
                 'id'                => (string) Str::uuid(),
                 'nomor_penjualan'   => $nomorPenjualan,
@@ -56,14 +55,13 @@ class PenjualanController extends Controller
                 'tanggal_penjualan' => $tanggal,
                 'status_penjualan'  => 'selesai',
                 'subtotal'          => $subtotal,
-                'jumlah_diskon'     => 0, // Bisa dikembangkan nanti dengan tabel promo
+                'jumlah_diskon'     => 0,
                 'jumlah_pajak'      => 0,
                 'total_penjualan'   => $subtotal,
                 'catatan'           => $request->catatan,
             ]);
 
-            // Simpan Detail Keranjang ke tabel `detail_penjualan`
-            foreach ($items as $item) {
+            foreach ($request->items as $item) {
                 $itemSubtotal = $item['jumlah'] * $item['harga_satuan'];
                 
                 DetailPenjualan::create([
@@ -74,28 +72,74 @@ class PenjualanController extends Controller
                     'harga_satuan'     => $item['harga_satuan'],
                     'subtotal'         => $itemSubtotal,
                 ]);
+
+                $varian = VarianProduk::find($item['varian_produk_id']);
+                
+                if ($varian) {
+                    $resep = Resep::where('produk_id', $varian->produk_id)->first();
+
+                    if ($resep) {
+                        $detailReseps = DetailResep::where('resep_id', $resep->id)->get();
+
+                        foreach ($detailReseps as $dR) {
+                            $totalBahanDipakai = $item['jumlah'] * $dR->jumlah;
+
+                            $stokGerobak = StokGerobak::where('gerobak_id', $request->gerobak_id)
+                                                      ->where('bahan_baku_id', $dR->bahan_baku_id)
+                                                      ->first();
+
+                            // =========================================================
+                            // VALIDASI: CEK KETERSEDIAAN STOK SEBELUM DIPOTONG
+                            // =========================================================
+                            $sisaStok = $stokGerobak ? $stokGerobak->jumlah_saat_ini : 0;
+                            
+                            if (!$stokGerobak || $sisaStok < $totalBahanDipakai) {
+                                // Ambil nama bahan baku agar pesan error mudah dibaca kasir
+                                $namaBahan = DB::table('bahan_baku')->where('id', $dR->bahan_baku_id)->value('nama') ?? 'Bahan Tidak Diketahui';
+                                
+                                // Gagalkan proses dengan melempar Exception
+                                throw new \Exception("Stok {$namaBahan} tidak mencukupi! Sisa: {$sisaStok}, Dibutuhkan: {$totalBahanDipakai}");
+                            }
+                            // =========================================================
+
+                            // Jika lolos validasi, kurangi stok seperti biasa
+                            $stokGerobak->jumlah_saat_ini -= $totalBahanDipakai;
+                            $stokGerobak->terakhir_diperbarui = Carbon::now();
+                            $stokGerobak->save();
+
+                            MutasiStok::create([
+                                'id'              => (string) Str::uuid(),
+                                'stok_gerobak_id' => $stokGerobak->id,
+                                'jenis_mutasi'    => 'keluar',
+                                'tipe_referensi'  => 'penjualan',
+                                'id_referensi'    => $penjualan->id,
+                                'jumlah'          => $totalBahanDipakai,
+                                'catatan'         => 'Pengurangan otomatis sistem POS',
+                                'tanggal_mutasi'  => Carbon::now(),
+                            ]);
+                        }
+                    }
+                }
             }
 
-            // Jika semua lancar, Commit (Simpan permanen ke database)
             DB::commit();
 
-            // Load data detail agar respon API menampilkan struk yang lengkap
             $penjualan->load('detail');
 
             return response()->json([
                 'success' => true,
-                'message' => 'Transaksi berhasil dicatat!',
+                'message' => 'Transaksi berhasil dicatat dan stok gerobak telah diperbarui!',
                 'data'    => $penjualan
             ], 201);
 
         } catch (\Exception $e) {
-            // Jika ada error (misal koneksi putus), batalkan semua input
             DB::rollBack();
+            // Menangkap pesan error dari validasi stok dan menampilkannya
             return response()->json([
                 'success' => false,
-                'message' => 'Terjadi kesalahan saat mencatat transaksi.',
+                'message' => 'Transaksi Gagal!',
                 'error'   => $e->getMessage()
-            ], 500);
+            ], 400); // Mengubah status menjadi 400 Bad Request
         }
     }
 }
