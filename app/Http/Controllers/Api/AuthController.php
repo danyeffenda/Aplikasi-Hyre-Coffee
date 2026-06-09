@@ -61,6 +61,12 @@ class AuthController extends Controller
             ], 500);
         }
 
+        /** * REVISI LANGKAH 2: 
+         * Melakukan 'Eager Loading' untuk menarik data dari tabel peran.
+         * Pastikan fungsi peran() sudah ada di model App\Models\Pengguna.
+         */
+        $user->load('peran'); 
+
         // 6. Response Sukses - Kirim Token dan Detail Peran ke Frontend
         return response()->json([
             'success' => true,
@@ -73,7 +79,12 @@ class AuthController extends Controller
                     'id' => $user->id,
                     'nama_lengkap' => $user->nama_lengkap,
                     'email' => $user->email,
-                    'peran_id' => $user->peran_id
+                    'peran_id' => $user->peran_id,
+                    /**
+                     * Mengambil nama peran dari tabel relasi.
+                     * strtolower digunakan agar di React Anda cukup mengecek: role === 'admin'
+                     */
+                    'nama_peran' => $user->peran ? strtolower($user->peran->nama) : 'kasir'
                 ]
             ]
         ], 200);

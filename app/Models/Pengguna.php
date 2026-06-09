@@ -66,4 +66,14 @@ class Pengguna extends Authenticatable implements JWTSubject
     {
         return $this->kata_sandi_hash;
     }
+
+    /**
+     * Relasi ke Tabel Peran
+     * Memungkinkan kita mengambil nama peran (Admin/Kasir) secara langsung.
+     */
+    public function peran()
+    {
+        // Hubungkan foreign key 'peran_id' di tabel pengguna ke tabel 'peran'
+        return $this->belongsTo(Peran::class, 'peran_id', 'id');
+    }
 }
