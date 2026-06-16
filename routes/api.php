@@ -17,10 +17,11 @@ Route::middleware('auth:api')->group(function () {
         Route::post('/logout', [AuthController::class, 'logout']);
     });
 
-    // Rute Gerobak
     Route::apiResource('gerobak', GerobakController::class);
     Route::apiResource('kategori', \App\Http\Controllers\Api\KategoriProdukController::class);
     Route::apiResource('produk', \App\Http\Controllers\Api\ProdukController::class);
     Route::apiResource('penjualan', \App\Http\Controllers\Api\PenjualanController::class);
     Route::apiResource('varian-produk', \App\Http\Controllers\Api\VarianProdukController::class);
+    Route::apiResource('pegawai', \App\Http\Controllers\Api\PegawaiController::class);
+    Route::get('dashboard/ringkasan', [\App\Http\Controllers\Api\DashboardController::class, 'ringkasan']);
 });
