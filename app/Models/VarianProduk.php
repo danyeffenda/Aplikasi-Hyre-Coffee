@@ -18,7 +18,7 @@ class VarianProduk extends Model
     public $incrementing = false;
 
     protected $fillable = [
-        'id', 'produk_id', 'nama_varian', 'label_ukuran', 
-        'suhu', 'harga_tambahan', 'sku', 'aktif'
+        'id', 'produk_id', 'nama_varian', 'kategori_pilihan', 
+        'harga_tambahan', 'sku', 'aktif'
     ];
 }

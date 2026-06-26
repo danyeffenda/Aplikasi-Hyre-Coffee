@@ -18,7 +18,7 @@ class DetailPenjualan extends Model
     public $incrementing = false;
 
     protected $fillable = [
-        'id', 'penjualan_id', 'varian_produk_id', 'jumlah', 
+        'id', 'penjualan_id', 'produk_id', 'jumlah', 
         'harga_satuan', 'subtotal', 'catatan'
     ];
 

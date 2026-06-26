@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Penjualan;
 use App\Models\DetailPenjualan;
 use App\Models\VarianProduk;
+use App\Models\Produk;
 use App\Models\Resep;
 use App\Models\DetailResep;
 use App\Models\StokGerobak;
@@ -26,7 +27,7 @@ class PenjualanController extends Controller
             'pelanggan_id'             => 'nullable|uuid',
             'catatan'                  => 'nullable|string',
             'items'                    => 'required|array|min:1',
-            'items.*.varian_produk_id' => 'required|uuid',
+            'items.*.produk_id'         => 'required|uuid',
             'items.*.jumlah'           => 'required|integer|min:1',
             'items.*.harga_satuan'     => 'required|numeric|min:0',
         ]);
@@ -67,16 +68,16 @@ class PenjualanController extends Controller
                 DetailPenjualan::create([
                     'id'               => (string) Str::uuid(),
                     'penjualan_id'     => $penjualan->id,
-                    'varian_produk_id' => $item['varian_produk_id'],
+                    'produk_id'        => $item['produk_id'],
                     'jumlah'           => $item['jumlah'],
                     'harga_satuan'     => $item['harga_satuan'],
                     'subtotal'         => $itemSubtotal,
                 ]);
 
-                $varian = VarianProduk::find($item['varian_produk_id']);
+                $produk = Produk::find($item['produk_id']);
                 
-                if ($varian) {
-                    $resep = Resep::where('produk_id', $varian->produk_id)->first();
+                if ($produk) {
+                    $resep = Resep::where('produk_id', $produk->id)->first();
 
                     if ($resep) {
                         $detailReseps = DetailResep::where('resep_id', $resep->id)->get();

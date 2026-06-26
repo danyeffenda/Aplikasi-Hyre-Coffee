@@ -9,33 +9,39 @@ use Illuminate\Support\Str;
 
 class VarianProdukController extends Controller
 {
+    public function index()
+    {
+        return response()->json([
+            'success' => true,
+            'data' => VarianProduk::all()
+        ], 200);
+    }
+
     public function store(Request $request)
     {
         $request->validate([
-            'produk_id'      => 'required|uuid',
-            'nama_varian'    => 'required|string',
-            'label_ukuran'   => 'nullable|string',
-            'suhu'           => 'nullable|string',
-            'harga_tambahan' => 'nullable|numeric',
+            'produk_id'        => 'nullable|exists:produk,id',
+            'kategori_pilihan' => 'required|string|max:255', // Sekarang wajib diisi
+            'nama_varian'      => 'nullable|string|max:255', // Boleh kosong sesuai skema baru
+            'harga_tambahan'   => 'required|numeric',        // Wajib diisi (bisa 0)
+            'sku'              => 'nullable|string|max:100',
+            'aktif'            => 'boolean',
         ]);
 
         $data = $request->all();
-        $data['id'] = (string) Str::uuid();
-        $data['harga_tambahan'] = $data['harga_tambahan'] ?? 0;
+        
+        if (!isset($data['id'])) {
+            $data['id'] = (string) Str::uuid();
+        }
+        
+        $data['aktif'] = $data['aktif'] ?? true;
 
         $varian = VarianProduk::create($data);
 
         return response()->json([
             'success' => true,
-            'message' => 'Varian berhasil ditambahkan',
+            'message' => 'Data varian berhasil ditambahkan.',
             'data'    => $varian
         ], 201);
-    }
-    public function index()
-    {
-        return response()->json([
-            'success' => true,
-            'data' => \App\Models\VarianProduk::all()
-        ], 200);
     }
 }
