@@ -10,34 +10,25 @@ use Carbon\Carbon;
 
 class DashboardController extends Controller
 {
-    public function ringkasan()
+        public function ringkasan()
     {
-        $hariIni = Carbon::today()->toDateString();
+        // Menggunakan timezone Asia/Jakarta untuk memastikan filter 'hari ini' akurat
+        $hariIni = \Carbon\Carbon::now('Asia/Jakarta')->toDateString();
 
         // 1. Hitung Master Data
-        $totalProduk = Produk::count();
-        $totalPegawai = Pegawai::count();
+        $totalProduk = \App\Models\Produk::count();
+        $totalPegawai = \App\Models\Pegawai::count();
 
-        // 2. Hitung Data Penjualan (Kita gunakan try-catch agar aman jika struktur tabel penjualan Anda berbeda)
-        $transaksiHariIni = 0;
-        $pendapatanHariIni = 0;
+        // 2. Hitung Data Penjualan
+        // Menggunakan kolom 'dibuat_pada' sesuai model Penjualan.php
+        // Menggunakan kolom 'total_penjualan' sesuai model Penjualan.php
+        $transaksiHariIni = \Illuminate\Support\Facades\DB::table('penjualan')
+            ->whereDate('dibuat_pada', $hariIni)
+            ->count();
 
-        try {
-            // Asumsi: tabel bernama 'penjualan' dan memiliki kolom 'dibuat_pada' serta 'total_harga'
-            // Silakan sesuaikan 'total_harga' dengan nama kolom asli di tabel Anda jika berbeda
-            $transaksiHariIni = DB::table('penjualan')
-                ->whereDate('dibuat_pada', $hariIni)
-                ->count();
-
-            // Uncomment baris di bawah ini jika Anda sudah memiliki kolom total pemasukan di tabel penjualan
-            /*
-            $pendapatanHariIni = DB::table('penjualan')
-                ->whereDate('dibuat_pada', $hariIni)
-                ->sum('total_harga'); 
-            */
-        } catch (\Exception $e) {
-            // Abaikan error jika tabel penjualan belum siap, kirim 0
-        }
+        $pendapatanHariIni = \Illuminate\Support\Facades\DB::table('penjualan')
+            ->whereDate('dibuat_pada', $hariIni)
+            ->sum('total_penjualan'); 
 
         return response()->json([
             'success' => true,
